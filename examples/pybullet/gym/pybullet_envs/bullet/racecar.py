@@ -1,7 +1,9 @@
 import os
-import numpy as np
 import copy
 import math
+import random
+
+import numpy as np
 
 class Racecar:
 
@@ -12,13 +14,35 @@ class Racecar:
 		self.reset()
 
 	def reset(self):
-		car = self._p.loadURDF(os.path.join(self.urdfRootPath,"racecar/racecar_differential.urdf"), [0,0,.2],useFixedBase=False)
+		# dist = 5 + 2. * random.random()
+    	# ang = 2. * 3.1415925438 * random.random()
+
+    	# ballx = dist * math.sin(ang)
+    	# bally = dist * math.cos(ang)
+    	# ballz = 1
+		# dist = 1 * random.random()
+		# ang = 2. * 3.1415925438 * random.random()
+
+		# carx = dist * math.sin(ang)
+		# cary = dist * math.cos(ang)
+		# carz = 1
+		carx = np.random.uniform(-5,5)
+		if(random.random() >= 0.5):
+			cary = np.random.uniform(1,1.9)
+		else:
+			cary = -np.random.uniform(1,1.9)
+		#cary = np.random.uniform(-2,2)
+		#carx = cary = 0.0
+		# print('cary')
+		# print(cary)
+		#carz = 1
+		car = self._p.loadURDF(os.path.join(self.urdfRootPath,"racecar/racecar_differential.urdf"), [carx,cary,.2],useFixedBase=False)
 		self.racecarUniqueId = car
 		#for i in range (self._p.getNumJoints(car)):
 		#	print (self._p.getJointInfo(car,i))
 		for wheel in range(self._p.getNumJoints(car)):
 				self._p.setJointMotorControl2(car,wheel,self._p.VELOCITY_CONTROL,targetVelocity=0,force=0)
-				self._p.getJointInfo(car,wheel)	
+				self._p.getJointInfo(car,wheel)
 
 		#self._p.setJointMotorControl2(car,10,self._p.VELOCITY_CONTROL,targetVelocity=1,force=10)
 		c = self._p.createConstraint(car,9,car,11,jointType=self._p.JOINT_GEAR,jointAxis =[0,1,0],parentFramePosition=[0,0,0],childFramePosition=[0,0,0])
@@ -80,4 +104,3 @@ class Racecar:
 			self._p.setJointMotorControl2(self.racecarUniqueId,motor,self._p.VELOCITY_CONTROL,targetVelocity=targetVelocity,force=self.maxForce)
 		for steer in self.steeringLinks:
 			self._p.setJointMotorControl2(self.racecarUniqueId,steer,self._p.POSITION_CONTROL,targetPosition=steeringAngle)
-
