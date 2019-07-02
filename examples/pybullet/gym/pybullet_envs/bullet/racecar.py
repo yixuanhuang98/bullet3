@@ -14,18 +14,7 @@ class Racecar:
 		self.reset()
 
 	def reset(self):
-		# dist = 5 + 2. * random.random()
-    	# ang = 2. * 3.1415925438 * random.random()
-
-    	# ballx = dist * math.sin(ang)
-    	# bally = dist * math.cos(ang)
-    	# ballz = 1
-		# dist = 1 * random.random()
-		# ang = 2. * 3.1415925438 * random.random()
-
-		# carx = dist * math.sin(ang)
-		# cary = dist * math.cos(ang)
-		# carz = 1
+    #print('enter reset function')
 		carx = np.random.uniform(-5,5)
 		if(random.random() >= 0.5):
 			cary = np.random.uniform(1,1.9)
@@ -38,6 +27,7 @@ class Racecar:
 		#carz = 1
 		car = self._p.loadURDF(os.path.join(self.urdfRootPath,"racecar/racecar_differential.urdf"), [carx,cary,.2],useFixedBase=False)
 		self.racecarUniqueId = car
+    #print('enter reset func')
 		#for i in range (self._p.getNumJoints(car)):
 		#	print (self._p.getJointInfo(car,i))
 		for wheel in range(self._p.getNumJoints(car)):
