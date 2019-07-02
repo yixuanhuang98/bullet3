@@ -97,7 +97,7 @@ class Racecar:
 		steeringAngle = motorCommands[1]*self.steeringMultiplier
 		#print("steeringAngle")
 		#print(steeringAngle)
-		#print("maxForce")
+		#print("max")
 		#print(self.maxForce)
 
 		for motor in self.motorizedwheels:
