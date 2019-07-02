@@ -5,10 +5,10 @@ os.sys.path.insert(0,parentdir)
 
 import math
 import gym
+import time
 from gym import spaces
 from gym.utils import seeding
 import numpy as np
-import time
 import pybullet
 from . import racecar
 import random
@@ -31,7 +31,7 @@ class RacecarGymEnv(gym.Env):
                isEnableSelfCollision=True,
                isDiscrete=False,
                renders=False):
-    print("init")
+    #print("init")
     self._timeStep = 0.01
     self._urdfRoot = urdfRoot
     self._actionRepeat = actionRepeat
@@ -41,13 +41,18 @@ class RacecarGymEnv(gym.Env):
     self._envStepCounter = 0
     self._renders = renders
     self._isDiscrete = isDiscrete
+    self.violation_flag = False
+    self.step_violation = 0
+    self.total_violation =0 
+    self.total_perfect = 0
+    self.total_finish_with_violation = 0
     if self._renders:
       self._p = bullet_client.BulletClient(
           connection_mode=pybullet.GUI)
     else:
       self._p = bullet_client.BulletClient()
 
-    self._seed()
+    self.seed()
     #self.reset()
     observationDim = 2 #len(self.getExtendedObservation())
     #print("observationDim")
@@ -60,11 +65,11 @@ class RacecarGymEnv(gym.Env):
        action_dim = 2
        self._action_bound = 1
        action_high = np.array([self._action_bound] * action_dim)
-       self.action_space = spaces.Box(-action_high, action_high)
-    self.observation_space = spaces.Box(-observation_high, observation_high)
+       self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
+    self.observation_space = spaces.Box(-observation_high, observation_high, dtype=np.float32)
     self.viewer = None
 
-  def _reset(self):
+  def reset(self):
     self._p.resetSimulation()
     #p.setPhysicsEngineParameter(numSolverIterations=300)
     self._p.setTimeStep(self._timeStep)
@@ -76,14 +81,17 @@ class RacecarGymEnv(gym.Env):
     #	newpos = [pos[0],pos[1],pos[2]-0.1]
     #	self._p.resetBasePositionAndOrientation(i,newpos,orn)
 
-    dist = 5 +2.*random.random()
-    ang = 2.*3.1415925438*random.random()
+    dist = 5
+    ang = -3.1415925438/2
 
     ballx = dist * math.sin(ang)
     bally = dist * math.cos(ang)
     ballz = 1
 
     self._ballUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot,"sphere2.urdf"),[ballx,bally,ballz])
+    self.obstacle = self._p.loadURDF(os.path.join(self._urdfRoot,"r2d2.urdf"),[ballx/2,bally,ballz])
+
+
     self._p.setGravity(0,0,-10)
     self._racecar = racecar.Racecar(self._p,urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
     self._envStepCounter = 0
@@ -95,7 +103,7 @@ class RacecarGymEnv(gym.Env):
   def __del__(self):
     self._p = 0
 
-  def _seed(self, seed=None):
+  def seed(self, seed=None):
     self.np_random, seed = seeding.np_random(seed)
     return [seed]
 
@@ -106,22 +114,23 @@ class RacecarGymEnv(gym.Env):
      invCarPos,invCarOrn = self._p.invertTransform(carpos,carorn)
      ballPosInCar,ballOrnInCar = self._p.multiplyTransforms(invCarPos,invCarOrn,ballpos,ballorn)
 
-     self._observation.extend([ballPosInCar[0],ballPosInCar[1]])
+     self._observation.extend([carpos[0],carpos[1]])
      return self._observation
 
-  def _step(self, action):
+  def step(self, action):
     if (self._renders):
       basePos,orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
       #self._p.resetDebugVisualizerCamera(1, 30, -40, basePos)
 
     if (self._isDiscrete):
 	    fwd = [-1,-1,-1,0,0,0,1,1,1]
-	    steerings = [-0.6,0,0.6,-0.6,0,0.6,-0.6,0,0.6]
+	    steerings = [-1,0,1,-1,0,1,-1,0,1] # previous : 0.6
 	    forward = fwd[action]
 	    steer = steerings[action]
 	    realaction = [forward,steer]
     else:
-      realaction = action
+      #print('not discrete')   # default for then pybullet is continuous
+      realaction = action#action [1,0.6] right down [-1,0.6] upper right   [-1,-0.6] upper left
 
     self._racecar.applyAction(realaction)
     for i in range(self._actionRepeat):
@@ -135,11 +144,17 @@ class RacecarGymEnv(gym.Env):
       self._envStepCounter += 1
     reward = self._reward()
     done = self._termination()
-    #print("len=%r" % len(self._observation))
-
+    carpos,carorn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
+    ballpos,ballorn = self._p.getBasePositionAndOrientation(self._ballUniqueId)
+    # print('carpos')    # right down is (+,+) 
+    # print(carpos)
+    
+    # if(carpos[1] > 1 or carpos[1] < -1):    #(left:-   right: +) the influence of field
+    #   reward += -3*(abs(carpos[1]))
+    
     return np.array(self._observation), reward, done, {}
 
-  def _render(self, mode='human', close=False):
+  def render(self, mode='human', close=False):
     if mode != "rgb_array":
       return np.array([])
     base_pos,orn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
@@ -162,10 +177,16 @@ class RacecarGymEnv(gym.Env):
 
 
   def _termination(self):
-    return self._envStepCounter>1000
+    return self._envStepCounter > 1000
 
   def _reward(self):
+    carpos,carorn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
+    ballpos,ballorn = self._p.getBasePositionAndOrientation(self._ballUniqueId)
+    obstaclepos , obstacleorn = self._p.getBasePositionAndOrientation(self.obstacle)
+    
     closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,self._ballUniqueId,10000)
+
+    obstacle_clossestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId, self.obstacle, 10000)
 
     numPt = len(closestPoints)
     reward=-1000
@@ -173,11 +194,15 @@ class RacecarGymEnv(gym.Env):
     if (numPt>0):
       #print("reward:")
       reward = -closestPoints[0][8]
+      
+    reward = reward + obstacle_clossestPoints[0][8]  # the penalty putting on the obstacle
       #print(reward)
+    #reward = (-5-carpos[0])
+    # reward = 0
     return reward
 
-  if parse_version(gym.__version__)>=parse_version('0.9.6'):
-    render = _render
-    reset = _reset
-    seed = _seed
-    step = _step
+  if parse_version(gym.__version__) < parse_version('0.9.6'):
+    _render = render
+    _reset = reset
+    _seed = seed
+    _step = step
