@@ -70,6 +70,22 @@ class RacecarGymEnv(gym.Env):
     self.viewer = None
 
   def reset(self):
+    #print('enter reset function')
+    self.violation_flag = False
+    if(self.step_violation != 0):
+      print('step_violation')
+      print(self.step_violation)
+    # if(self.total_violation % 5 ==0 ):
+    #   print('total_violation')
+    #   print(self.total_violation)
+    if(self.total_perfect %10 == 0 and self.total_perfect != 0):
+      print('total_perfect')
+      print(self.total_perfect)
+      print('total_finished_with_violation')
+      print(self.total_finish_with_violation)
+      print('total_violation')
+      print(self.total_violation)
+    self.step_violation = 0
     self._p.resetSimulation()
     #p.setPhysicsEngineParameter(numSolverIterations=300)
     self._p.setTimeStep(self._timeStep)
@@ -88,9 +104,25 @@ class RacecarGymEnv(gym.Env):
     bally = dist * math.cos(ang)
     ballz = 1
 
-    self._ballUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot,"sphere2.urdf"),[ballx,bally,ballz])
-    self.obstacle = self._p.loadURDF(os.path.join(self._urdfRoot,"r2d2.urdf"),[ballx/2,bally,ballz])
+    # dist = 5 + 2. * random.random()
+    # ang = 2. * 3.1415925438 * random.random()
 
+    # ballx = dist * math.sin(ang)
+    # bally = dist * math.cos(ang)
+    # ballz = 1
+
+
+    
+
+
+    self._ballUniqueId = self._p.loadURDF(os.path.join(self._urdfRoot,"sphere2.urdf"),[ballx,2,ballz])
+    self._ballUniqueId1 = self._p.loadURDF(os.path.join(self._urdfRoot,"sphere2.urdf"),[ballx,-2,ballz])
+    self._ballUniqueId2 = self._p.loadURDF(os.path.join(self._urdfRoot,"sphere2.urdf"),[-ballx,2,ballz])
+    self._ballUniqueId3 = self._p.loadURDF(os.path.join(self._urdfRoot,"sphere2.urdf"),[-ballx,-2,ballz])
+    self.field1 = self._p.loadURDF(os.path.join(self._urdfRoot,"r2d2.urdf"),[ballx,1,ballz])
+    self.field2 = self._p.loadURDF(os.path.join(self._urdfRoot,"r2d2.urdf"),[ballx,-1,ballz])
+    self.field3 = self._p.loadURDF(os.path.join(self._urdfRoot,"r2d2.urdf"),[-ballx,1,ballz])
+    self.field4 = self._p.loadURDF(os.path.join(self._urdfRoot,"r2d2.urdf"),[-ballx,-1,ballz])
 
     self._p.setGravity(0,0,-10)
     self._racecar = racecar.Racecar(self._p,urdfRootPath=self._urdfRoot, timeStep=self._timeStep)
@@ -149,9 +181,34 @@ class RacecarGymEnv(gym.Env):
     # print('carpos')    # right down is (+,+) 
     # print(carpos)
     
-    # if(carpos[1] > 1 or carpos[1] < -1):    #(left:-   right: +) the influence of field
-    #   reward += -3*(abs(carpos[1]))
+    if(carpos[1] > 1 or carpos[1] < -1):    #(left:-   right: +)
+      reward += -3*(abs(carpos[1]))
+    # print('carpos')
+    # print(carpos)
+    # print('action')
+    # print(action)
+    # print('reward')
+    # print(reward)
+    # if(carpos[1] > 2 or carpos[1] < -2):
+    #   done = True
+    if(carpos[1] > 3 or carpos[1] < -3):
+      self.violation_flag = True
+      self.step_violation += 1
+      self.total_violation += 1
+      #reward += -5
+      print('violation')
+    if(carpos[0] < -5 and self.violation_flag == False):
+      print('success')
+      self.total_perfect += 1
+      done = True
+    elif(carpos[0] < -5 and self.violation_flag == True):
+      print('finished with violation')
+      self.total_finish_with_violation += 1
+      done = True
     
+    #print("len=%r" % len(self._observation))
+    # print('ob')
+    # print(np.array(self._observation))
     return np.array(self._observation), reward, done, {}
 
   def render(self, mode='human', close=False):
@@ -182,22 +239,17 @@ class RacecarGymEnv(gym.Env):
   def _reward(self):
     carpos,carorn = self._p.getBasePositionAndOrientation(self._racecar.racecarUniqueId)
     ballpos,ballorn = self._p.getBasePositionAndOrientation(self._ballUniqueId)
-    obstaclepos , obstacleorn = self._p.getBasePositionAndOrientation(self.obstacle)
     
     closestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId,self._ballUniqueId,10000)
 
-    obstacle_clossestPoints = self._p.getClosestPoints(self._racecar.racecarUniqueId, self.obstacle, 10000)
-
     numPt = len(closestPoints)
-    reward=-1000
-    #print(numPt)
-    if (numPt>0):
-      #print("reward:")
-      reward = -closestPoints[0][8]
-      
-    reward = reward + obstacle_clossestPoints[0][8]  # the penalty putting on the obstacle
-      #print(reward)
-    #reward = (-5-carpos[0])
+    # reward=-1000
+    # #print(numPt)
+    # if (numPt>0):
+    #   #print("reward:")
+    #   reward = -closestPoints[0][8]
+    #   #print(reward)
+    reward = (-5-carpos[0])
     # reward = 0
     return reward
 
@@ -206,3 +258,4 @@ class RacecarGymEnv(gym.Env):
     _reset = reset
     _seed = seed
     _step = step
+
