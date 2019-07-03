@@ -195,7 +195,7 @@ class RacecarGymEnv(gym.Env):
       #print("reward:")
       reward = -closestPoints[0][8]
       
-    reward = reward + obstacle_clossestPoints[0][8]  # the penalty putting on the obstacle
+    reward = reward + obstacle_clossestPoints[0][8]  # the penalty with the obstacle
       #print(reward)
     #reward = (-5-carpos[0])
     # reward = 0
